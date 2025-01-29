@@ -23,8 +23,7 @@ class SleepModel(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
-# Set Ngrok URL (Replace with the actual public URL)
-SERVER_URL = "https://special-dolphin-incredibly.ngrok-free.app"  # Replace with your ngrok URL
+SERVER_URL = "https://special-dolphin-incredibly.ngrok-free.app" 
 
 def client_program(client_id, data_dir):
     # Load client data
