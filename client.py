@@ -3,10 +3,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import json
 import pandas as pd
 import os
 import sys
+import threading
+import time
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
 
 # Define the neural network model
 class SleepModel(nn.Module):
@@ -23,10 +27,43 @@ class SleepModel(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
-SERVER_URL = "https://special-dolphin-incredibly.ngrok-free.app" 
+SERVER_URL = "https://special-dolphin-incredibly.ngrok-free.app"  # Replace with actual Ngrok URL
+
+# Global variables for tracking model updates
+global_model_lock = threading.Lock()  # Lock to handle global model updates safely
+global_model_received = None
+global_round = 0  # Track the current round
+
+@app.route('/receive', methods=['POST'])
+def receive_model():
+    """Receive updated global model from the server."""
+    global global_model_received, global_round
+
+    data = request.json
+    server_round = data.get("round")
+    new_weights = data.get("weights")
+
+    with global_model_lock:
+        if server_round == global_round + 1:  # ✅ Ensure update matches expected round
+            print(f"✅ Client received the global model update for round {server_round}.")
+            global_model_received = new_weights
+            global_round = server_round  # ✅ Move to the next round
+        else:
+            print(f"⚠️ Received update for round {server_round}, but expected {global_round + 1}. Ignoring.")
+
+    return jsonify({"status": "received"}), 200
+
+def start_flask_server(port):
+    """Run the Flask server in a separate thread."""
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 def client_program(client_id, data_dir):
-    # Load client data
+    global global_model_received, global_round
+
+    # Assign a unique port based on `5000 + client_id + 1`
+    client_port = 5000 + client_id + 1  
+    print(f"🔄 Client {client_id} will use port {client_port} to receive global model updates.")
+
     X_client = pd.read_csv(os.path.join(data_dir, f"client_{client_id}", "X_client.csv"))
     y_client = pd.read_csv(os.path.join(data_dir, f"client_{client_id}", "y_client.csv"))
 
@@ -40,8 +77,25 @@ def client_program(client_id, data_dir):
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
     criterion = nn.CrossEntropyLoss()
 
-    for iteration in range(10):  # Match global iterations
-        print(f"Client {client_id} - Starting Training (Iteration {iteration + 1})")
+    # Start Flask server only once in a separate thread
+    flask_thread = threading.Thread(target=start_flask_server, args=(client_port,), daemon=True)
+    flask_thread.start()
+
+    # Notify the server of the connection with the correct port
+    response = requests.post(f"{SERVER_URL}/connect", json={"client_address": f"localhost:{client_port}"}).json()
+    global_iterations = response["global_iterations"]
+    print(f"Client {client_id} connected. Global iterations set to {global_iterations}. Waiting for all clients to join...")
+
+    while True:
+        response = requests.get(f"{SERVER_URL}/ready")
+        status = response.json()["status"]
+        if status == "ready":
+            break
+        print(f"Client {client_id}: {response.json()['message']}")
+        time.sleep(5)
+
+    for iteration in range(global_iterations):  
+        print(f"Client {client_id} - Starting Training (Iteration {iteration + 1}/{global_iterations})")
 
         model.train()
         for epoch in range(5):
@@ -51,7 +105,6 @@ def client_program(client_id, data_dir):
             loss.backward()
             optimizer.step()
 
-        # Evaluate accuracy
         model.eval()
         with torch.no_grad():
             outputs = model(X_tensor)
@@ -60,29 +113,28 @@ def client_program(client_id, data_dir):
 
         print(f"Client {client_id} - Local Accuracy: {accuracy:.2f}")
 
-        # Convert model to NumPy
-        model_weights = [p.data.numpy().tolist() for p in model.parameters()]
-
-
         # Send model update to server
-        response = requests.post(f"{SERVER_URL}/upload", json={
-            "weights": model_weights,
-            "accuracy": accuracy
-        })
+        model_weights = [p.data.numpy().tolist() for p in model.parameters()]
+        requests.post(f"{SERVER_URL}/upload", json={"weights": model_weights, "accuracy": accuracy})
 
-        if response.status_code == 200:
-            print("Model uploaded successfully.")
+        print(f"Client {client_id} - Sent local model to server for iteration {iteration + 1}. Now waiting for the global model...")
 
-        # Get updated global model
-        response = requests.get(f"{SERVER_URL}/download")
-        if response.status_code == 200:
-            global_weights = response.json().get("weights")
-            if global_weights:
-                for param, new_weights in zip(model.parameters(), global_weights):
-                    param.data = torch.tensor(np.array(new_weights), dtype=torch.float32)
-                print("Updated model with new global weights.")
+        # ✅ Clients now wait without polling
+        global_model_received = None  # Reset received model
+        expected_round = iteration + 1
+
+        while True:
+            with global_model_lock:
+                if global_model_received is not None and global_round == expected_round:
+                    print(f"✅ Client {client_id} - Applying new global model for round {global_round}.")
+                    for param, new_weights in zip(model.parameters(), global_model_received):
+                        param.data = torch.tensor(new_weights, dtype=torch.float32)
+                    break  # Exit waiting loop once model is updated
+
+            print(f"⏳ Client {client_id} - Still waiting for global model update for round {expected_round}...")
+            time.sleep(3)
 
 if __name__ == "__main__":
-    client_id = int(sys.argv[1])
+    client_id = int(sys.argv[1])  # Client ID from command line
     data_dir = "client_data"
     client_program(client_id, data_dir)
