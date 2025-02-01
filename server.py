@@ -1,11 +1,9 @@
+import socket
+import threading
 import torch
 import torch.nn as nn
 import io
-import json
-import numpy as np
-from flask import Flask, request, jsonify
-from pyngrok import ngrok
-import threading
+import struct
 
 # Define the neural network model
 class SleepModel(nn.Module):
@@ -22,77 +20,99 @@ class SleepModel(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
-# Initialize Flask app
-app = Flask(__name__)
+# Server Program
+def server_program():
+    host = "0.0.0.0"  
+    port = 5001  
+    num_clients = 2  
+    global_iterations = 15  
 
-# Federated Learning Parameters
-global_iterations = 10  # Change this as needed
-num_clients = 2
-global_model = SleepModel(11, 3)
-global_state = None  # Stores the latest global model weights
-received_models = []  # Stores client model updates
-received_accuracies = []
+    input_size = 11  
+    num_classes = 3  
+    global_model = SleepModel(input_size, num_classes)
+    global_state = None  
 
-@app.route('/')
-def home():
-    return jsonify({"message": "Federated Learning Server Running"}), 200
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((host, port))
+    server_socket.listen(num_clients)
+    print(f"Server is waiting for {num_clients} clients to connect...")
 
-@app.route('/upload', methods=['POST'])
-def receive_weights():
-    """Receive and store model weights from clients"""
-    global received_models, received_accuracies
+    clients = []
+    client_ids = {}
 
-    try:
-        data = request.json  # Expecting JSON
-        weights = np.array(data["weights"])
-        accuracy = data["accuracy"]
+    # Accept client connections
+    for i in range(num_clients):
+        conn, addr = server_socket.accept()
+        clients.append(conn)
+        client_ids[conn] = i + 1  # Assign a client ID
+        print(f"Client {client_ids[conn]} ({addr}) connected. ({len(clients)}/{num_clients})")
 
-        received_models.append(weights)
-        received_accuracies.append(accuracy)
+    print("All clients connected. Server is ready to iterate.")
 
-        print(f"Received model update from client | Accuracy: {accuracy:.2f}")
+    # Send global iterations count
+    for client in clients:
+        client.sendall(struct.pack(">I", global_iterations))
 
-        # If all clients sent updates, aggregate
-        if len(received_models) >= num_clients:
-            aggregate_models()
-        
-        return jsonify({"status": "success", "message": "Model received"}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 400
+    for iteration in range(global_iterations):
+        print(f"\n--- Global Iteration {iteration + 1}/{global_iterations} ---")
 
-def aggregate_models():
-    """Perform Federated Averaging (FedAvg)"""
-    global global_state, received_models, received_accuracies
+        if iteration > 0:
+            buffer = io.BytesIO()
+            torch.save(global_state, buffer)
+            model_data = buffer.getvalue()
 
-    print("Aggregating client models...")
+            for client in clients:
+                client.sendall(struct.pack(">I", len(model_data)))  
+                client.sendall(model_data)  
+                print(f"Sent aggregated weights to Client {client_ids[client]}")
 
-    avg_weights = np.mean(np.array(received_models), axis=0).tolist()
-    global_state = avg_weights  # Store updated global model
-    received_models = []  # Reset for next round
-    received_accuracies = []  # Reset accuracies
+        client_models = []
+        client_accuracies = []
 
-    print(f"Global Model Aggregated | Clients Processed: {num_clients}")
+        def handle_client(conn):
+            try:
+                print(f"Waiting for model update from Client {client_ids[conn]}...")
 
-@app.route('/download', methods=['GET'])
-def send_weights():
-    """Send latest global model to clients"""
-    global global_state
+                buffer = b""
+                while len(buffer) < 4:
+                    buffer += conn.recv(4 - len(buffer))
 
-    if global_state is None:
-        return jsonify({"status": "error", "message": "No global model available"}), 400
-    
-    return jsonify({
-        "status": "success",
-        "weights": global_state
-    }), 200
+                msg_size = struct.unpack(">I", buffer)[0]
 
-def run_ngrok():
-    """Start Ngrok Tunnel"""
-    ngrok.set_auth_token("2sB8FAfQjsOAKPY1RKWWkaXx3Up_5BQ4NYgKiLDmTeNjMrVKz")  # Replace with your actual Ngrok token
-    pub_url = ngrok.connect(addr="https://localhost:5001", proto = "http", url = "special-dolphin-incredibly.ngrok-free.app")
-    ngrok_url = pub_url.public_url.replace('http://', 'https://')
-    print(f"Ngrok URL: {ngrok_url}")
+                buffer = b""
+                while len(buffer) < msg_size:
+                    buffer += conn.recv(msg_size - len(buffer))
 
-if __name__ == '__main__':
-    threading.Thread(target=run_ngrok, daemon=True).start()
-    app.run(host="0.0.0.0", port=5001, ssl_context=('cert.pem', 'key.pem'), debug=False)
+                print(f"Received {len(buffer)} bytes from Client {client_ids[conn]}")
+                buffer_io = io.BytesIO(buffer)
+                client_data = torch.load(buffer_io)
+                client_models.append(client_data["state_dict"])
+                client_accuracies.append(client_data["accuracy"])
+
+            except Exception as e:
+                print(f"Error receiving data from Client {client_ids[conn]}: {e}")
+
+        threads = [threading.Thread(target=handle_client, args=(client,)) for client in clients]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        if len(client_models) == num_clients:
+            print("Received all client weights. Beginning aggregation...")
+
+            global_state = {key: torch.stack([cm[key] for cm in client_models]).mean(dim=0) for key in client_models[0].keys()}
+            global_model.load_state_dict(global_state)
+
+            global_accuracy = sum(client_accuracies) / len(client_accuracies)
+            print(f"Global Model Accuracy after iteration {iteration + 1}: {global_accuracy:.2f}")
+
+    torch.save(global_model.state_dict(), "final_global_model.pth")
+    print("Training complete. Final global model saved.")
+
+    for client in clients:
+        client.close()
+    server_socket.close()
+
+if __name__ == "__main__":
+    server_program()
