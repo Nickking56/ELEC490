@@ -53,6 +53,28 @@ def trigger_leds(direction):
     with open(LED_FILE, 'w') as f:
         f.write(direction)
 
+# Function to set idle mode
+def set_idle_mode():
+    # Trigger idle mode for LEDs
+    with open(LED_FILE, 'w') as f:
+        f.write("idle")
+    
+    # Display stays showing the last iteration number
+    # (No need to update DISPLAY_FILE)
+
+# Function to reset the displays
+def reset_displays():
+    # Reset the iteration display to 000
+    with open(DISPLAY_FILE, 'w') as f:
+        f.write("0")
+    
+    # Reset the LEDs
+    with open(LED_FILE, 'w') as f:
+        f.write("reset")
+    
+    # Wait for controllers to process the commands
+    time.sleep(0.2)
+
 # Function to stop controllers on exit
 def stop_controllers(display_process, led_process):
     # Signal to stop running
@@ -84,6 +106,12 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
     
     # Start display and LED controllers
     display_process, led_process = start_controllers()
+    
+    # Wait a moment for controllers to start
+    time.sleep(0.5)
+    
+    # Reset displays to initial state
+    reset_displays()
     
     # Register function to stop controllers on exit
     atexit.register(lambda: stop_controllers(display_process, led_process))
@@ -175,9 +203,10 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
     client_socket.close()
     print(f"Client {client_id} training complete.")
     
-    # Stop controllers
-    stop_controllers(display_process, led_process)
-    atexit.unregister(lambda: stop_controllers(display_process, led_process))
+    # Set to idle mode instead of stopping controllers
+    set_idle_mode()
+    print("System set to idle mode. Display shows final iteration count with first and last LEDs on.")
+    print("Run the client again to reset and start a new training session.")
 
 if __name__ == "__main__":
     client_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1

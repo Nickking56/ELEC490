@@ -19,16 +19,38 @@ leds = [
 
 def client_to_server():
     """LED sequence to visualize data transfer from client to server"""
+    # Turn off all LEDs first
+    for led in leds:
+        led.off()
+    # Faster sequence
     for led in leds:
         led.on()
-        time.sleep(0.1)
+        time.sleep(0.03)
         led.off()
 
 def server_to_client():
     """LED sequence to visualize data transfer from server to client"""
+    # Turn off all LEDs first
+    for led in leds:
+        led.off()
+    # Faster sequence
     for led in reversed(leds):
         led.on()
-        time.sleep(0.1)
+        time.sleep(0.03)
+        led.off()
+        
+def idle_mode():
+    """Set idle mode - first and last LED on"""
+    # Turn off all LEDs first
+    for led in leds:
+        led.off()
+    # Turn on first and last LED
+    leds[0].on()
+    leds[-1].on()
+    
+def reset_leds():
+    """Reset all LEDs to off"""
+    for led in leds:
         led.off()
 
 def led_controller():
@@ -61,6 +83,16 @@ def led_controller():
                             
                     elif status == "server_to_client":
                         server_to_client()
+                        # Reset status after performing action
+                        with open(LED_FILE, 'w') as f:
+                            f.write("none")
+                            
+                    elif status == "idle":
+                        idle_mode()
+                        # Don't reset status for idle mode
+                        
+                    elif status == "reset":
+                        reset_leds()
                         # Reset status after performing action
                         with open(LED_FILE, 'w') as f:
                             f.write("none")
