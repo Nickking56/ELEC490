@@ -17,43 +17,41 @@ leds = [
     LED(27)   # LED 6
 ]
 
-def client_to_server():
-    """LED sequence to visualize data transfer from client to server - bounce pattern"""
+def communication_cycle():
+    """Visualize complete communication cycle between client and server"""
     # Turn off all LEDs first
     for led in leds:
         led.off()
     
-    # Forward movement (client -> server)
+    # Client sending to server (left to right)
     for led in leds:
         led.on()
         time.sleep(0.02)
     
-    # Brief pause at the end
+    # Brief pause at server end
     time.sleep(0.1)
     
-    # Turn all off in reverse order
-    for led in reversed(leds):
-        led.off()
+    # Server sending back to client (right to left)
+    for i in range(len(leds)-1, -1, -1):
+        # Turn off current LED
+        leds[i].off()
+        # Turn on previous LED (if not at the beginning)
+        if i > 0:
+            leds[i-1].on()
         time.sleep(0.02)
+    
+    # Final LED turns off after a short delay
+    time.sleep(0.05)
+    leds[0].off()
+
+# Keep these for backward compatibility but have them call the new function
+def client_to_server():
+    """Legacy function that now uses the complete cycle"""
+    communication_cycle()
 
 def server_to_client():
-    """LED sequence to visualize data transfer from server to client - bounce pattern"""
-    # Turn off all LEDs first
-    for led in leds:
-        led.off()
-    
-    # Backward movement (server -> client)
-    for led in reversed(leds):
-        led.on()
-        time.sleep(0.02)
-    
-    # Brief pause at the end
-    time.sleep(0.1)
-    
-    # Turn all off in forward order
-    for led in leds:
-        led.off()
-        time.sleep(0.02)
+    """Legacy function that now uses the complete cycle"""
+    communication_cycle()
         
 def idle_mode():
     """Set idle mode - first and last LED on"""
@@ -91,14 +89,8 @@ def led_controller():
                 with open(LED_FILE, 'r') as f:
                     status = f.read().strip()
                     
-                    if status == "client_to_server":
-                        client_to_server()
-                        # Reset status after performing action
-                        with open(LED_FILE, 'w') as f:
-                            f.write("none")
-                            
-                    elif status == "server_to_client":
-                        server_to_client()
+                    if status == "client_to_server" or status == "server_to_client" or status == "communicate":
+                        communication_cycle()
                         # Reset status after performing action
                         with open(LED_FILE, 'w') as f:
                             f.write("none")

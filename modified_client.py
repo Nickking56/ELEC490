@@ -49,9 +49,10 @@ def update_display(number):
         f.write(str(number))
 
 # Function to trigger LED sequences
-def trigger_leds(direction):
+def trigger_communication():
+    """Trigger the LED communication cycle"""
     with open(LED_FILE, 'w') as f:
-        f.write(direction)
+        f.write("communicate")
 
 # Function to set idle mode
 def set_idle_mode():
@@ -142,7 +143,7 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
         # Receive global model from server (except for first iteration)
         if iteration > 0:
             # Visualize server-to-client communication
-            trigger_leds("server_to_client")
+            trigger_communication()
             
             # Receive model size
             buffer = b""
@@ -195,7 +196,7 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
         client_socket.sendall(message)
         
         # Visualize client-to-server communication
-        trigger_leds("client_to_server")
+        trigger_communication()
         
         print(f"Client {client_id} sent updated weights to server.")
     
