@@ -212,3 +212,5 @@ if __name__ == "__main__":
     client_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     data_dir = "client_data"
     client_program(client_id, data_dir)
+    while True:
+        set_idle_mode()
