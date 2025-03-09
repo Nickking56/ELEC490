@@ -18,26 +18,42 @@ leds = [
 ]
 
 def client_to_server():
-    """LED sequence to visualize data transfer from client to server"""
+    """LED sequence to visualize data transfer from client to server - bounce pattern"""
     # Turn off all LEDs first
     for led in leds:
         led.off()
-    # Faster sequence
+    
+    # Forward movement (client -> server)
     for led in leds:
         led.on()
-        time.sleep(0.03)
+        time.sleep(0.02)
+    
+    # Brief pause at the end
+    time.sleep(0.1)
+    
+    # Turn all off in reverse order
+    for led in reversed(leds):
         led.off()
+        time.sleep(0.02)
 
 def server_to_client():
-    """LED sequence to visualize data transfer from server to client"""
+    """LED sequence to visualize data transfer from server to client - bounce pattern"""
     # Turn off all LEDs first
     for led in leds:
         led.off()
-    # Faster sequence
+    
+    # Backward movement (server -> client)
     for led in reversed(leds):
         led.on()
-        time.sleep(0.03)
+        time.sleep(0.02)
+    
+    # Brief pause at the end
+    time.sleep(0.1)
+    
+    # Turn all off in forward order
+    for led in leds:
         led.off()
+        time.sleep(0.02)
         
 def idle_mode():
     """Set idle mode - first and last LED on"""
