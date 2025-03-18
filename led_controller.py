@@ -51,7 +51,7 @@ def communication_cycle():
     
     # ---- PHASE 2: Pause at Halfway Point (Server Aggregation) ----
     # Add significant pause at server to simulate aggregation
-    time.sleep(0.5)  # Pause for aggregation
+    
     
     # Keep the main LED lit at the halfway point
     # and let the trailing LEDs gradually fade out
@@ -77,6 +77,7 @@ def communication_cycle():
     leds[halfway_point].value = 1.0
     time.sleep(0.01)  # Fast animation
     
+    time.sleep(0.5)  # Pause for aggregation
     # ---- PHASE 3: Server to Client (Right to Left) ----
     # Move from halfway point back to the left
     for i in range(halfway_point, -1, -1):

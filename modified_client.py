@@ -206,7 +206,7 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
         
         # Add a pause to simulate server aggregation time
         print(f"Server aggregating weights... (visualized by LED 6 pause)")
-        time.sleep(0.5)  # Aggregation pause
+        time.sleep(0.25)  # Aggregation pause
         
         print(f"Client {client_id} sent updated weights to server.")
     
