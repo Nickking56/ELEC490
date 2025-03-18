@@ -54,9 +54,14 @@ def trigger_communication():
     with open(LED_FILE, 'w') as f:
         f.write("communicate")
     
-    # Wait for LED animation to complete (approx 1.2 seconds)
-    # This ensures the animation finishes before continuing
-    time.sleep(1.2)
+    # Wait for LED animation to complete
+    time.sleep(0.8)  # Adjusted wait time for the animation
+
+# Function to set node LED on during training
+def set_node_training():
+    """Turn on the node LED to indicate local training"""
+    with open(LED_FILE, 'w') as f:
+        f.write("node_training")
 
 # Function to set idle mode
 def set_idle_mode():
@@ -139,16 +144,14 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
     
     # Main training loop
     for iteration in range(global_iterations):
-        # Update display with current iteration
-        update_display(iteration)
+        # Update display with current iteration + 1 (fix the counter being behind)
+        update_display(iteration + 1)
         
-        print(f"\nClient {client_id} - Starting local training (Iteration {iteration + 1}/{global_iterations})...")
+        print(f"\nClient {client_id} - Starting iteration {iteration + 1}/{global_iterations}...")
         
         # Receive global model from server (except for first iteration)
         if iteration > 0:
-            # Visualize server-to-client communication
             print(f"Receiving global model from server...")
-            trigger_communication()
             
             # Receive model size
             buffer = b""
@@ -165,9 +168,14 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
             buffer_io = io.BytesIO(buffer)
             global_state = torch.load(buffer_io)
             model.load_state_dict(global_state)
-            print(f"Client {client_id} received aggregated weights. Beginning next round of training.")
+            print(f"Client {client_id} received aggregated weights.")
         
         # Train local model
+        print(f"Training local model...")
+        
+        # Turn on node LED during training
+        set_node_training()
+        
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
         model.train()
@@ -200,15 +208,11 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
         # Send message
         client_socket.sendall(message)
         
-        # Visualize client-to-server communication
-        print(f"Sending updated weights to server...")
+        # Visualize communication cycle once per iteration
+        print(f"Communicating with server...")
         trigger_communication()
         
-        # Add a pause to simulate server aggregation time
-        print(f"Server aggregating weights... (visualized by LED 6 pause)")
-        time.sleep(0.25)  # Aggregation pause
-        
-        print(f"Client {client_id} sent updated weights to server.")
+        print(f"Iteration {iteration + 1} complete.")
     
     # Training complete
     client_socket.close()

@@ -9,12 +9,12 @@ RUNNING_FILE = "running_status.txt"
 
 # Define LEDs using PWM for brightness control
 leds = [
-    PWMLED(3),   # LED 1
+    PWMLED(3),   # LED 1 (node)
     PWMLED(14),  # LED 2
     PWMLED(4),   # LED 3
     PWMLED(15),  # LED 4
     PWMLED(17),  # LED 5
-    PWMLED(27)   # LED 6 (halfway point)
+    PWMLED(27)   # LED 6 (server)
 ]
 
 def communication_cycle():
@@ -26,12 +26,13 @@ def communication_cycle():
     for led in leds:
         led.value = 0
     
-    # Define the halfway point (index 5 - the 6th LED)
-    halfway_point = 5
+    # Define the node and server positions
+    node_led = 0       # LED 1
+    server_led = 5     # LED 6
     
     # ---- PHASE 1: Client to Server (Left to Right) ----
-    # Move from left to right until reaching the halfway point
-    for i in range(halfway_point + 1):
+    # Move from left to right until reaching the server
+    for i in range(server_led + 1):
         # Reset all LEDs
         for led in leds:
             led.value = 0
@@ -49,38 +50,37 @@ def communication_cycle():
             
         time.sleep(0.01)  # Fast animation
     
-    # ---- PHASE 2: Pause at Halfway Point (Server Aggregation) ----
-    # Add significant pause at server to simulate aggregation
-    
-    
-    # Keep the main LED lit at the halfway point
+    # ---- PHASE 2: Pause at Server (Aggregation) ----
+    # Keep the main LED lit at the server
     # and let the trailing LEDs gradually fade out
     
     # First trailing LED still visible
     for led in leds:
         led.value = 0
-    leds[halfway_point].value = 1.0
-    leds[halfway_point-1].value = 0.4
-    leds[halfway_point-2].value = 0.1
+    leds[server_led].value = 1.0
+    leds[server_led-1].value = 0.4
+    leds[server_led-2].value = 0.1
     time.sleep(0.01)  # Fast animation
     
     # Only the closest trailing LED visible
     for led in leds:
         led.value = 0
-    leds[halfway_point].value = 1.0
-    leds[halfway_point-1].value = 0.4
+    leds[server_led].value = 1.0
+    leds[server_led-1].value = 0.4
     time.sleep(0.01)  # Fast animation
     
-    # Only the main LED at the halfway point
+    # Only the server LED at full brightness
     for led in leds:
         led.value = 0
-    leds[halfway_point].value = 1.0
+    leds[server_led].value = 1.0
     time.sleep(0.01)  # Fast animation
     
+    # Pause at server for aggregation
     time.sleep(0.5)  # Pause for aggregation
+    
     # ---- PHASE 3: Server to Client (Right to Left) ----
-    # Move from halfway point back to the left
-    for i in range(halfway_point, -1, -1):
+    # Move from server back to the node
+    for i in range(server_led, -1, -1):
         # Reset all LEDs
         for led in leds:
             led.value = 0
@@ -103,6 +103,15 @@ def communication_cycle():
     time.sleep(0.05)  # Small pause at the end
     for led in leds:
         led.value = 0
+
+def node_training():
+    """Turn on node LED during local training"""
+    # Turn off all LEDs
+    for led in leds:
+        led.value = 0
+    
+    # Turn on the node LED (LED 1)
+    leds[0].value = 1.0
 
 def client_to_server():
     """Legacy function that now uses the complete cycle"""
@@ -158,6 +167,10 @@ def led_controller():
                         # Reset status after performing action
                         with open(LED_FILE, 'w') as f:
                             f.write("none")
+                    
+                    elif status == "node_training":
+                        node_training()
+                        # Don't reset status for node training - keeps LED on
                             
                     elif status == "idle":
                         idle_mode()
