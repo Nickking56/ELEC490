@@ -47,9 +47,12 @@ def communication_cycle():
         if i-2 >= 0:
             leds[i-2].value = 0.1
             
-        time.sleep(0.06)  # Faster animation
+        time.sleep(0.01)  # Fast animation
     
-    # ---- PHASE 2: Pause at Halfway Point ----
+    # ---- PHASE 2: Pause at Halfway Point (Server Aggregation) ----
+    # Add significant pause at server to simulate aggregation
+    time.sleep(0.3)  # Pause for aggregation
+    
     # Keep the main LED lit at the halfway point
     # and let the trailing LEDs gradually fade out
     
@@ -59,20 +62,20 @@ def communication_cycle():
     leds[halfway_point].value = 1.0
     leds[halfway_point-1].value = 0.4
     leds[halfway_point-2].value = 0.1
-    time.sleep(0.06)  # Faster animation
+    time.sleep(0.01)  # Fast animation
     
     # Only the closest trailing LED visible
     for led in leds:
         led.value = 0
     leds[halfway_point].value = 1.0
     leds[halfway_point-1].value = 0.4
-    time.sleep(0.06)  # Faster animation
+    time.sleep(0.01)  # Fast animation
     
     # Only the main LED at the halfway point
     for led in leds:
         led.value = 0
     leds[halfway_point].value = 1.0
-    time.sleep(0.06)  # Faster animation
+    time.sleep(0.01)  # Fast animation
     
     # ---- PHASE 3: Server to Client (Right to Left) ----
     # Move from halfway point back to the left
@@ -92,11 +95,11 @@ def communication_cycle():
         if i+2 < len(leds):
             leds[i+2].value = 0.1
             
-        time.sleep(0.06)  # Faster animation
+        time.sleep(0.01)  # Fast animation
     
     # ---- PHASE 4: End Cycle ----
     # Final cleanup - turn all LEDs off
-    time.sleep(0.05)  # Faster animation
+    time.sleep(0.05)  # Small pause at the end
     for led in leds:
         led.value = 0
 
@@ -169,7 +172,7 @@ def led_controller():
                 pass
                 
             # Small delay to prevent high CPU usage
-            time.sleep(0.1)
+            time.sleep(0.05)
             
     except KeyboardInterrupt:
         pass

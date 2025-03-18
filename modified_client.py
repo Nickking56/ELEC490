@@ -53,6 +53,10 @@ def trigger_communication():
     """Trigger the LED communication cycle"""
     with open(LED_FILE, 'w') as f:
         f.write("communicate")
+    
+    # Wait for LED animation to complete (approx 1.2 seconds)
+    # This ensures the animation finishes before continuing
+    time.sleep(1.2)
 
 # Function to set idle mode
 def set_idle_mode():
@@ -143,6 +147,7 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
         # Receive global model from server (except for first iteration)
         if iteration > 0:
             # Visualize server-to-client communication
+            print(f"Receiving global model from server...")
             trigger_communication()
             
             # Receive model size
@@ -196,7 +201,12 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
         client_socket.sendall(message)
         
         # Visualize client-to-server communication
+        print(f"Sending updated weights to server...")
         trigger_communication()
+        
+        # Add a pause to simulate server aggregation time
+        print(f"Server aggregating weights... (visualized by LED 6 pause)")
+        time.sleep(0.5)  # Aggregation pause
         
         print(f"Client {client_id} sent updated weights to server.")
     
