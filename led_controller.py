@@ -12,9 +12,9 @@ leds = [
     PWMLED(3),   # LED 1
     PWMLED(14),  # LED 2
     PWMLED(4),   # LED 3
-    PWMLED(15),  # LED 4 (halfway point)
+    PWMLED(15),  # LED 4
     PWMLED(17),  # LED 5
-    PWMLED(27)   # LED 6
+    PWMLED(27)   # LED 6 (halfway point)
 ]
 
 def communication_cycle():
@@ -26,8 +26,8 @@ def communication_cycle():
     for led in leds:
         led.value = 0
     
-    # Define the halfway point (index 3 - the 4th LED in a 6-LED setup)
-    halfway_point = 3
+    # Define the halfway point (index 5 - the 6th LED)
+    halfway_point = 5
     
     # ---- PHASE 1: Client to Server (Left to Right) ----
     # Move from left to right until reaching the halfway point
@@ -47,7 +47,7 @@ def communication_cycle():
         if i-2 >= 0:
             leds[i-2].value = 0.1
             
-        time.sleep(0.15)
+        time.sleep(0.06)  # Faster animation
     
     # ---- PHASE 2: Pause at Halfway Point ----
     # Keep the main LED lit at the halfway point
@@ -59,20 +59,20 @@ def communication_cycle():
     leds[halfway_point].value = 1.0
     leds[halfway_point-1].value = 0.4
     leds[halfway_point-2].value = 0.1
-    time.sleep(0.15)
+    time.sleep(0.06)  # Faster animation
     
     # Only the closest trailing LED visible
     for led in leds:
         led.value = 0
     leds[halfway_point].value = 1.0
     leds[halfway_point-1].value = 0.4
-    time.sleep(0.15)
+    time.sleep(0.06)  # Faster animation
     
     # Only the main LED at the halfway point
     for led in leds:
         led.value = 0
     leds[halfway_point].value = 1.0
-    time.sleep(0.15)
+    time.sleep(0.06)  # Faster animation
     
     # ---- PHASE 3: Server to Client (Right to Left) ----
     # Move from halfway point back to the left
@@ -92,11 +92,11 @@ def communication_cycle():
         if i+2 < len(leds):
             leds[i+2].value = 0.1
             
-        time.sleep(0.15)
+        time.sleep(0.06)  # Faster animation
     
     # ---- PHASE 4: End Cycle ----
     # Final cleanup - turn all LEDs off
-    time.sleep(0.1)
+    time.sleep(0.05)  # Faster animation
     for led in leds:
         led.value = 0
 
