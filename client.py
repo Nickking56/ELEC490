@@ -25,7 +25,7 @@ class SleepModel(nn.Module):
         return self.fc(x)
 
 # Client Program
-def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):  # Use ngrok's TCP address
+def client_program(client_id, data_dir, host="0.tcp.ngrok.io", port=19259):  # Use ngrok's TCP address
     print(f"Client {client_id} attempting to connect to server at {host}:{port}...")
 
     X_client = pd.read_csv(os.path.join(data_dir, f"client_{client_id}", "X_client.csv"))
