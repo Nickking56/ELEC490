@@ -1,4 +1,4 @@
-from gpiozero import LED
+from gpiozero import PWMLED
 import time
 import os
 import signal
@@ -7,44 +7,99 @@ import signal
 LED_FILE = "led_status.txt"
 RUNNING_FILE = "running_status.txt"
 
-# Define LEDs
+# Define LEDs using PWM for brightness control
 leds = [
-    LED(3),   # LED 1
-    LED(14),  # LED 2
-    LED(4),   # LED 3
-    LED(15),  # LED 4
-    LED(17),  # LED 5
-    LED(27)   # LED 6
+    PWMLED(3),   # LED 1
+    PWMLED(14),  # LED 2
+    PWMLED(4),   # LED 3
+    PWMLED(15),  # LED 4 (halfway point)
+    PWMLED(17),  # LED 5
+    PWMLED(27)   # LED 6
 ]
 
 def communication_cycle():
-    """Visualize complete communication cycle between client and server"""
+    """
+    Visualize communication with direction-dependent trailing glow
+    and pausing at the halfway point until trailing LEDs fade away
+    """
     # Turn off all LEDs first
     for led in leds:
-        led.off()
+        led.value = 0
     
-    # Client sending to server (left to right)
+    # Define the halfway point (index 3 - the 4th LED in a 6-LED setup)
+    halfway_point = 3
+    
+    # ---- PHASE 1: Client to Server (Left to Right) ----
+    # Move from left to right until reaching the halfway point
+    for i in range(halfway_point + 1):
+        # Reset all LEDs
+        for led in leds:
+            led.value = 0
+            
+        # Main LED at full brightness
+        leds[i].value = 1.0
+        
+        # Trailing LED one behind at medium brightness (if valid position)
+        if i-1 >= 0:
+            leds[i-1].value = 0.4
+        
+        # Trailing LED two behind at faint brightness (if valid position)
+        if i-2 >= 0:
+            leds[i-2].value = 0.1
+            
+        time.sleep(0.15)
+    
+    # ---- PHASE 2: Pause at Halfway Point ----
+    # Keep the main LED lit at the halfway point
+    # and let the trailing LEDs gradually fade out
+    
+    # First trailing LED still visible
     for led in leds:
-        led.on()
-        time.sleep(0.02)
+        led.value = 0
+    leds[halfway_point].value = 1.0
+    leds[halfway_point-1].value = 0.4
+    leds[halfway_point-2].value = 0.1
+    time.sleep(0.15)
     
-    # Brief pause at server end
+    # Only the closest trailing LED visible
+    for led in leds:
+        led.value = 0
+    leds[halfway_point].value = 1.0
+    leds[halfway_point-1].value = 0.4
+    time.sleep(0.15)
+    
+    # Only the main LED at the halfway point
+    for led in leds:
+        led.value = 0
+    leds[halfway_point].value = 1.0
+    time.sleep(0.15)
+    
+    # ---- PHASE 3: Server to Client (Right to Left) ----
+    # Move from halfway point back to the left
+    for i in range(halfway_point, -1, -1):
+        # Reset all LEDs
+        for led in leds:
+            led.value = 0
+            
+        # Main LED at full brightness
+        leds[i].value = 1.0
+        
+        # Trailing LED (now on the right) at medium brightness
+        if i+1 < len(leds):
+            leds[i+1].value = 0.4
+        
+        # Second trailing LED at faint brightness
+        if i+2 < len(leds):
+            leds[i+2].value = 0.1
+            
+        time.sleep(0.15)
+    
+    # ---- PHASE 4: End Cycle ----
+    # Final cleanup - turn all LEDs off
     time.sleep(0.1)
-    
-    # Server sending back to client (right to left)
-    for i in range(len(leds)-1, -1, -1):
-        # Turn off current LED
-        leds[i].off()
-        # Turn on previous LED (if not at the beginning)
-        if i > 0:
-            leds[i-1].on()
-        time.sleep(0.02)
-    
-    # Final LED turns off after a short delay
-    time.sleep(0.05)
-    leds[0].off()
+    for led in leds:
+        led.value = 0
 
-# Keep these for backward compatibility but have them call the new function
 def client_to_server():
     """Legacy function that now uses the complete cycle"""
     communication_cycle()
@@ -57,21 +112,26 @@ def idle_mode():
     """Set idle mode - first and last LED on"""
     # Turn off all LEDs first
     for led in leds:
-        led.off()
+        led.value = 0
     # Turn on first and last LED
-    leds[0].on()
-    leds[-1].on()
+    leds[0].value = 1.0
+    leds[-1].value = 1.0
     
 def reset_leds():
     """Reset all LEDs to off"""
     for led in leds:
-        led.off()
+        led.value = 0
 
 def led_controller():
     """Main loop for the LED controller"""
     # Initialize LED status file
     with open(LED_FILE, 'w') as f:
         f.write("none")
+    
+    # Initialize running status file if it doesn't exist
+    if not os.path.exists(RUNNING_FILE):
+        with open(RUNNING_FILE, 'w') as f:
+            f.write("1")  # Default to running
     
     try:
         while True:
@@ -116,7 +176,7 @@ def led_controller():
     finally:
         # Turn off all LEDs
         for led in leds:
-            led.off()
+            led.value = 0
         print("LED controller stopped")
 
 if __name__ == "__main__":
