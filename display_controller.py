@@ -102,6 +102,26 @@ def display_number(number):
     turn_on_segment(3, digit3)
     time.sleep(0.005)
 
+def wait_display():
+    """Display 'UAIt' for waiting"""
+    # Custom segment patterns for "UAIt"
+    patterns = [
+        # 'u' pattern for first digit
+        (0, 0, 1, 1, 1, 0, 0),
+        # 'A' pattern for second digit
+        (1, 1, 1, 0, 1, 1, 1),
+        # 'I' pattern for third digit (with 't' in lowercase)
+        (0, 1, 1, 0, 0, 0, 0),
+    ]
+    
+    # Display each custom digit
+    turn_on_custom_segments(1, patterns[0])
+    time.sleep(0.005)
+    turn_on_custom_segments(2, patterns[1])
+    time.sleep(0.005)
+    turn_on_custom_segments(3, patterns[2])
+    time.sleep(0.005)
+
 def snake_animation_frame(frame_num):
     """Generate a snake animation frame"""
     # Define the snake animation sequence
@@ -137,68 +157,3 @@ def display_snake_animation_frame(frame_num):
     patterns = snake_animation_frame(frame_num)
     
     # Display each digit with its pattern
-    turn_on_custom_segments(1, patterns[0])
-    time.sleep(0.005)
-    turn_on_custom_segments(2, patterns[1])
-    time.sleep(0.005)
-    turn_on_custom_segments(3, patterns[2])
-    time.sleep(0.005)
-
-def display_controller():
-    """Main loop for the display controller"""
-    setup_display()
-    
-    # Initialize display status file
-    with open(DISPLAY_FILE, 'w') as f:
-        f.write("0")
-    
-    # Initialize running status file
-    with open(RUNNING_FILE, 'w') as f:
-        f.write("1")
-    
-    try:
-        current_number = 0
-        animation_frame = 0
-        while True:
-            # Check if we should continue running
-            try:
-                with open(RUNNING_FILE, 'r') as f:
-                    if f.read().strip() != "1":
-                        break
-            except:
-                # If file not found, continue running
-                pass
-                
-            # Read the current number to display
-            try:
-                with open(DISPLAY_FILE, 'r') as f:
-                    display_status = f.read().strip()
-                    
-                    if display_status == "loading":
-                        # Show loading animation
-                        display_snake_animation_frame(animation_frame)
-                        animation_frame += 1
-                        # Slow down animation slightly
-                        time.sleep(0.02)
-                    else:
-                        try:
-                            # Try to interpret as a number
-                            new_number = int(display_status)
-                            if new_number != current_number:
-                                current_number = new_number
-                            display_number(current_number)
-                        except ValueError:
-                            # If not a number and not "loading", default to showing current number
-                            display_number(current_number)
-            except:
-                # If file not found or error reading, continue with current number
-                display_number(current_number)
-            
-    except KeyboardInterrupt:
-        pass
-    finally:
-        GPIO.cleanup()
-        print("Display controller stopped")
-
-if __name__ == "__main__":
-    display_controller()

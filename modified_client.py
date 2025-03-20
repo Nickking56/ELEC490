@@ -98,6 +98,21 @@ def reset_displays():
     # Wait for controllers to process the commands
     time.sleep(0.2)
 
+# Function to display celebration animation at the end
+def display_celebration():
+    """Show a celebration animation at the end of training"""
+    # Flash all LEDs multiple times in a celebratory pattern
+    for _ in range(3):
+        flash_all_leds()
+        time.sleep(0.3)
+    
+    # Sequential lighting of all LEDs
+    with open(LED_FILE, 'w') as f:
+        f.write("celebration")
+    
+    # Wait for celebration animation to complete
+    time.sleep(3.0)  # Longer celebration sequence
+
 # Function to stop controllers on exit
 def stop_controllers(display_process, led_process):
     # Signal to stop running
@@ -127,7 +142,7 @@ def client_program(client_id, data_dir, host="0.tcp.ngrok.io", port=19259):
     # Register function to stop controllers on exit
     atexit.register(lambda: stop_controllers(display_process, led_process))
     
-    # Set loading animation while connecting
+    # Set loading animation while connecting - continues until connection established
     set_loading_animation()
     
     print(f"Client {client_id} attempting to connect to server at {host}:{port}...")
@@ -145,38 +160,42 @@ def client_program(client_id, data_dir, host="0.tcp.ngrok.io", port=19259):
     # Connect to server
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
-    try:
-        client_socket.connect((host, port))
-        print(f"Client {client_id} connected to server at {host}:{port}")
+    # Connection retry loop with animation continuing
+    connection_established = False
+    while not connection_established:
+        try:
+            client_socket.connect((host, port))
+            connection_established = True
+            print(f"Client {client_id} connected to server at {host}:{port}")
+        except socket.error as e:
+            # Keep animation running during connection attempts
+            print(f"Connection attempt failed: {e}. Retrying in 5 seconds...")
+            time.sleep(5)
+            continue
         
-        # Display waiting message
-        update_display("wait")
-        print(f"Client {client_id} waiting for all clients to be ready...")
+    # Display waiting message - continue animation until all clients connected
+    update_display("wait")
+    print(f"Client {client_id} waiting for all clients to be ready...")
+    
+    # Send ready signal to server
+    ready_message = struct.pack(">I", 1)  # 1 means ready
+    client_socket.sendall(ready_message)
+    
+    # Wait for server to signal all clients are ready
+    buffer = b""
+    while len(buffer) < 4:
+        buffer += client_socket.recv(4 - len(buffer))
+    start_signal = struct.unpack(">I", buffer)[0]
+    
+    if start_signal == 1:
+        # All clients are ready - flash all LEDs to indicate synchronization
+        print(f"All clients are ready. Starting training synchronously.")
+        flash_all_leds()
         
-        # Send ready signal to server
-        ready_message = struct.pack(">I", 1)  # 1 means ready
-        client_socket.sendall(ready_message)
-        
-        # Wait for server to signal all clients are ready
-        buffer = b""
-        while len(buffer) < 4:
-            buffer += client_socket.recv(4 - len(buffer))
-        start_signal = struct.unpack(">I", buffer)[0]
-        
-        if start_signal == 1:
-            # All clients are ready - flash all LEDs to indicate synchronization
-            print(f"All clients are ready. Starting training synchronously.")
-            flash_all_leds()
-            
-            # Reset display to show 0 after connection
-            update_display(0)
-        else:
-            print(f"Received unexpected start signal: {start_signal}")
-            update_display(0)
-            return
-    except Exception as e:
-        print(f"Connection failed: {e}")
-        # Stop loading animation on error
+        # Reset display to show 0 after connection
+        update_display(0)
+    else:
+        print(f"Received unexpected start signal: {start_signal}")
         update_display(0)
         return
     
@@ -263,14 +282,15 @@ def client_program(client_id, data_dir, host="0.tcp.ngrok.io", port=19259):
         
         print(f"Iteration {iteration + 1} complete.")
     
-    # Training complete - flash all LEDs to indicate completion
-    flash_all_leds()
+    # Training complete - display celebration animation
+    print(f"Training complete! Showing celebration sequence.")
+    display_celebration()
     
     # Close the socket
     client_socket.close()
     print(f"Client {client_id} training complete.")
     
-    # Set to idle mode instead of stopping controllers
+    # Set to idle mode after celebration
     set_idle_mode()
     print("System set to idle mode. Display shows final iteration count with first and last LEDs on.")
     print("Run the client again to reset and start a new training session.")

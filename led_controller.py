@@ -124,6 +124,63 @@ def flash_all_leds():
     # Short delay
     time.sleep(0.2)
 
+def celebration_sequence():
+    """Play a celebration animation when training is complete"""
+    # Turn off all LEDs first
+    for led in leds:
+        led.value = 0
+    
+    # Pattern 1: Sequential lighting - left to right
+    for i in range(len(leds)):
+        leds[i].value = 1.0
+        time.sleep(0.1)
+    
+    time.sleep(0.3)
+    
+    # Pattern 2: Sequential off - right to left
+    for i in range(len(leds)-1, -1, -1):
+        leds[i].value = 0
+        time.sleep(0.1)
+    
+    time.sleep(0.3)
+    
+    # Pattern 3: Alternating LEDs (even/odd)
+    for _ in range(3):  # Repeat 3 times
+        # Turn on evens, off odds
+        for i in range(len(leds)):
+            leds[i].value = 1.0 if i % 2 == 0 else 0
+        time.sleep(0.2)
+        
+        # Switch: turn on odds, off evens
+        for i in range(len(leds)):
+            leds[i].value = 1.0 if i % 2 != 0 else 0
+        time.sleep(0.2)
+    
+    # Pattern 4: Wave effect
+    for _ in range(2):  # Repeat twice
+        # Increasing brightness wave left to right
+        for i in range(len(leds)):
+            for j in range(len(leds)):
+                # Distance-based brightness
+                distance = abs(i - j)
+                if distance == 0:
+                    leds[j].value = 1.0  # Main LED at full brightness
+                elif distance == 1:
+                    leds[j].value = 0.5  # Adjacent LEDs at 50% brightness
+                elif distance == 2:
+                    leds[j].value = 0.2  # Further LEDs at 20% brightness
+                else:
+                    leds[j].value = 0
+            time.sleep(0.1)
+    
+    # Final flash - all LEDs on then off
+    for led in leds:
+        led.value = 1.0
+    time.sleep(0.5)
+    
+    for led in leds:
+        led.value = 0
+
 def node_training():
     """Turn on node LED during local training"""
     # Turn off all LEDs
@@ -194,6 +251,12 @@ def led_controller():
                     
                     elif status == "flash":
                         flash_all_leds()
+                        # Reset status after performing action
+                        with open(LED_FILE, 'w') as f:
+                            f.write("none")
+                            
+                    elif status == "celebration":
+                        celebration_sequence()
                         # Reset status after performing action
                         with open(LED_FILE, 'w') as f:
                             f.write("none")
