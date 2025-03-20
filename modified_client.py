@@ -114,7 +114,7 @@ def stop_controllers(display_process, led_process):
     if led_process.poll() is None:
         led_process.terminate()
 
-def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
+def client_program(client_id, data_dir, host="0.tcp.ngrok.io", port=19259):
     # Start display and LED controllers
     display_process, led_process = start_controllers()
     
