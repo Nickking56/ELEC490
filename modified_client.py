@@ -98,21 +98,6 @@ def reset_displays():
     # Wait for controllers to process the commands
     time.sleep(0.2)
 
-# Function to display celebration animation at the end
-def display_celebration():
-    """Show a celebration animation at the end of training"""
-    # Flash all LEDs multiple times in a celebratory pattern
-    for _ in range(3):
-        flash_all_leds()
-        time.sleep(0.3)
-    
-    # Sequential lighting of all LEDs
-    with open(LED_FILE, 'w') as f:
-        f.write("celebration")
-    
-    # Wait for celebration animation to complete
-    time.sleep(3.0)  # Longer celebration sequence
-
 # Function to stop controllers on exit
 def stop_controllers(display_process, led_process):
     # Signal to stop running
@@ -142,11 +127,6 @@ def client_program(client_id, data_dir, host="0.tcp.ngrok.io", port=19259):
     # Register function to stop controllers on exit
     atexit.register(lambda: stop_controllers(display_process, led_process))
     
-    # Set loading animation while connecting - continues until connection established
-    set_loading_animation()
-    
-    print(f"Client {client_id} attempting to connect to server at {host}:{port}...")
-    
     # Load client data
     X_client = pd.read_csv(os.path.join(data_dir, f"client_{client_id}", "X_client.csv"))
     y_client = pd.read_csv(os.path.join(data_dir, f"client_{client_id}", "y_client.csv"))
@@ -160,20 +140,25 @@ def client_program(client_id, data_dir, host="0.tcp.ngrok.io", port=19259):
     # Connect to server
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
-    # Connection retry loop with animation continuing
-    connection_established = False
-    while not connection_established:
+    # Set loading animation while connecting - continues until connection is established
+    set_loading_animation()
+    
+    print(f"Client {client_id} attempting to connect to server at {host}:{port}...")
+    
+    # Try to connect with animation continuing
+    connected = False
+    while not connected:
         try:
             client_socket.connect((host, port))
-            connection_established = True
+            connected = True
             print(f"Client {client_id} connected to server at {host}:{port}")
         except socket.error as e:
-            # Keep animation running during connection attempts
             print(f"Connection attempt failed: {e}. Retrying in 5 seconds...")
+            # Keep the loading animation going
             time.sleep(5)
             continue
-        
-    # Display waiting message - continue animation until all clients connected
+    
+    # Display waiting message - continue animation until all clients are ready
     update_display("wait")
     print(f"Client {client_id} waiting for all clients to be ready...")
     
@@ -282,9 +267,14 @@ def client_program(client_id, data_dir, host="0.tcp.ngrok.io", port=19259):
         
         print(f"Iteration {iteration + 1} complete.")
     
-    # Training complete - display celebration animation
-    print(f"Training complete! Showing celebration sequence.")
-    display_celebration()
+    # Training complete - flash all LEDs multiple times to indicate completion
+    print(f"Training complete! Showing completion sequence.")
+    for _ in range(3):  # Flash multiple times for a more noticeable ending
+        flash_all_leds()
+        time.sleep(0.3)
+    
+    # Additional delay before idle mode to make ending sequence last longer
+    time.sleep(2.0)
     
     # Close the socket
     client_socket.close()
