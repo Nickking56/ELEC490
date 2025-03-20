@@ -50,9 +50,28 @@ def turn_on_segment(DigitPos, Number):
         9: (1, 1, 1, 1, 0, 1, 1)   # 9
     }
     
-    # Turn on/off segments based on the number
-    for idx, num in enumerate(nums[Number]):
-        if num == 1:
+    # Special segment patterns
+    patterns = {
+        # Line pattern for loading
+        'line1': (1, 0, 0, 0, 0, 0, 0),  # Top
+        'line2': (0, 1, 0, 0, 0, 0, 0),  # Top right
+        'line3': (0, 0, 1, 0, 0, 0, 0),  # Bottom right
+        'line4': (0, 0, 0, 1, 0, 0, 0),  # Bottom
+        'line5': (0, 0, 0, 0, 1, 0, 0),  # Bottom left
+        'line6': (0, 0, 0, 0, 0, 1, 0),  # Top left
+        'dash':  (0, 0, 0, 0, 0, 0, 1)   # Middle dash
+    }
+    
+    # If Number is a string, it might be a special pattern
+    if isinstance(Number, str) and Number in patterns:
+        pattern = patterns[Number]
+    else:
+        # Otherwise, get the standard number pattern
+        pattern = nums[Number]
+    
+    # Turn on/off segments based on the pattern
+    for idx, seg in enumerate(pattern):
+        if seg == 1:
             GPIO.output(segments[idx], GPIO.LOW)
         else:
             GPIO.output(segments[idx], GPIO.HIGH)
@@ -79,6 +98,24 @@ def display_number(number):
     turn_on_segment(3, digit3)
     time.sleep(0.005)
 
+def display_loading_animation(frame):
+    """Display a snake-like loading animation on the 7-segment display"""
+    # Loading animation pattern - circles around the display
+    patterns = ['line1', 'line2', 'line3', 'line4', 'line5', 'line6']
+    
+    # Calculate current position in animation
+    pos1 = frame % 6
+    pos2 = (frame + 2) % 6
+    pos3 = (frame + 4) % 6
+    
+    # Display each segment of the animation on different digits
+    turn_on_segment(1, patterns[pos1])
+    time.sleep(0.005)
+    turn_on_segment(2, patterns[pos2])
+    time.sleep(0.005)
+    turn_on_segment(3, patterns[pos3])
+    time.sleep(0.005)
+
 def display_controller():
     """Main loop for the display controller"""
     setup_display()
@@ -93,6 +130,9 @@ def display_controller():
     
     try:
         current_number = 0
+        loading_frame = 0
+        in_loading_mode = False
+        
         while True:
             # Check if we should continue running
             try:
@@ -103,18 +143,38 @@ def display_controller():
                 # If file not found, continue running
                 pass
                 
-            # Read the current number to display
+            # Read the current display mode
             try:
                 with open(DISPLAY_FILE, 'r') as f:
-                    new_number = int(f.read().strip())
-                    if new_number != current_number:
-                        current_number = new_number
+                    status = f.read().strip()
+                    
+                    if status == "loading":
+                        in_loading_mode = True
+                    elif in_loading_mode and status != "loading":
+                        # Exit loading mode if status changed
+                        in_loading_mode = False
+                        try:
+                            current_number = int(status)
+                        except:
+                            current_number = 0
+                    elif not in_loading_mode:
+                        try:
+                            new_number = int(status)
+                            if new_number != current_number:
+                                current_number = new_number
+                        except:
+                            # If not a number, ignore
+                            pass
             except:
-                # If file not found or error reading, continue with current number
+                # If file not found or error reading, continue with current mode
                 pass
                 
-            # Display the number
-            display_number(current_number)
+            # Display based on current mode
+            if in_loading_mode:
+                display_loading_animation(loading_frame)
+                loading_frame = (loading_frame + 1) % 6  # Cycle through animation frames
+            else:
+                display_number(current_number)
             
     except KeyboardInterrupt:
         pass
