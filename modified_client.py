@@ -159,7 +159,7 @@ def client_program(client_id, data_dir, host="0.tcp.ngrok.io", port=19259):
             continue
     
     # Display waiting message - continue animation until all clients are ready
-    update_display("wait")
+    #update_display("wait")
     print(f"Client {client_id} waiting for all clients to be ready...")
     
     # Send ready signal to server
