@@ -48,6 +48,19 @@ def update_display(number):
     with open(DISPLAY_FILE, 'w') as f:
         f.write(str(number))
 
+# Function to set loading animation
+def set_loading_animation():
+    with open(DISPLAY_FILE, 'w') as f:
+        f.write("loading")
+
+# Function to flash all LEDs once
+def flash_all_leds():
+    with open(LED_FILE, 'w') as f:
+        f.write("flash")
+    
+    # Wait for LED animation to complete
+    time.sleep(0.7)
+
 # Function to trigger LED sequences
 def trigger_communication():
     """Trigger the LED communication cycle"""
@@ -102,18 +115,6 @@ def stop_controllers(display_process, led_process):
         led_process.terminate()
 
 def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
-    print(f"Client {client_id} attempting to connect to server at {host}:{port}...")
-    
-    # Load client data
-    X_client = pd.read_csv(os.path.join(data_dir, f"client_{client_id}", "X_client.csv"))
-    y_client = pd.read_csv(os.path.join(data_dir, f"client_{client_id}", "y_client.csv"))
-    
-    X_tensor = torch.tensor(X_client.values, dtype=torch.float32)
-    y_tensor = torch.tensor(y_client.values.flatten(), dtype=torch.long)
-    
-    dataset = TensorDataset(X_tensor, y_tensor)
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-    
     # Start display and LED controllers
     display_process, led_process = start_controllers()
     
@@ -126,10 +127,38 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
     # Register function to stop controllers on exit
     atexit.register(lambda: stop_controllers(display_process, led_process))
     
+    # Set loading animation while connecting
+    set_loading_animation()
+    
+    print(f"Client {client_id} attempting to connect to server at {host}:{port}...")
+    
+    # Load client data
+    X_client = pd.read_csv(os.path.join(data_dir, f"client_{client_id}", "X_client.csv"))
+    y_client = pd.read_csv(os.path.join(data_dir, f"client_{client_id}", "y_client.csv"))
+    
+    X_tensor = torch.tensor(X_client.values, dtype=torch.float32)
+    y_tensor = torch.tensor(y_client.values.flatten(), dtype=torch.long)
+    
+    dataset = TensorDataset(X_tensor, y_tensor)
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    
     # Connect to server
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((host, port))
-    print(f"Client {client_id} connected to server at {host}:{port}")
+    
+    try:
+        client_socket.connect((host, port))
+        print(f"Client {client_id} connected to server at {host}:{port}")
+        
+        # Connection successful - flash all LEDs to indicate success
+        flash_all_leds()
+        
+        # Reset display to show 0 after connection
+        update_display(0)
+    except Exception as e:
+        print(f"Connection failed: {e}")
+        # Stop loading animation on error
+        update_display(0)
+        return
     
     # Receive number of global iterations
     buffer = b""
@@ -214,7 +243,10 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
         
         print(f"Iteration {iteration + 1} complete.")
     
-    # Training complete
+    # Training complete - flash all LEDs to indicate completion
+    flash_all_leds()
+    
+    # Close the socket
     client_socket.close()
     print(f"Client {client_id} training complete.")
     

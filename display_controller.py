@@ -57,6 +57,29 @@ def turn_on_segment(DigitPos, Number):
         else:
             GPIO.output(segments[idx], GPIO.HIGH)
 
+def turn_on_custom_segments(DigitPos, segment_pattern):
+    """Turn on specific segments based on a pattern"""
+    # Digit selection mapping
+    digitsMap = {
+        1: (1, 0, 0),  # First digit (hundreds)
+        2: (0, 1, 0),  # Second digit (tens)
+        3: (0, 0, 1)   # Third digit (ones)
+    }
+    
+    # Select the correct digit
+    for idx, digit in enumerate(digitsMap[DigitPos]):
+        if digit == 1:
+            GPIO.output(digits[idx], GPIO.HIGH)
+        else:
+            GPIO.output(digits[idx], GPIO.LOW)
+    
+    # Turn on/off segments based on the pattern
+    for idx, segment_state in enumerate(segment_pattern):
+        if segment_state == 1:
+            GPIO.output(segments[idx], GPIO.LOW)
+        else:
+            GPIO.output(segments[idx], GPIO.HIGH)
+
 def get_digit(number, n):
     """Get the nth digit of a number"""
     return number // 10**n % 10
@@ -79,6 +102,48 @@ def display_number(number):
     turn_on_segment(3, digit3)
     time.sleep(0.005)
 
+def snake_animation_frame(frame_num):
+    """Generate a snake animation frame"""
+    # Define the snake animation sequence
+    # Each tuple has patterns for each digit (1, 2, 3)
+    snake_frames = [
+        # Frame 0: Top segment of all digits
+        [(1,0,0,0,0,0,0), (1,0,0,0,0,0,0), (1,0,0,0,0,0,0)],
+        # Frame 1: Top-right segment
+        [(0,1,0,0,0,0,0), (0,1,0,0,0,0,0), (0,1,0,0,0,0,0)],
+        # Frame 2: Bottom-right segment
+        [(0,0,1,0,0,0,0), (0,0,1,0,0,0,0), (0,0,1,0,0,0,0)],
+        # Frame 3: Bottom segment
+        [(0,0,0,1,0,0,0), (0,0,0,1,0,0,0), (0,0,0,1,0,0,0)],
+        # Frame 4: Bottom-left segment
+        [(0,0,0,0,1,0,0), (0,0,0,0,1,0,0), (0,0,0,0,1,0,0)],
+        # Frame 5: Top-left segment
+        [(0,0,0,0,0,1,0), (0,0,0,0,0,1,0), (0,0,0,0,0,1,0)],
+        # Frame 6: Middle segment
+        [(0,0,0,0,0,0,1), (0,0,0,0,0,0,1), (0,0,0,0,0,0,1)],
+        # Additional frames for smoother animation
+        [(1,1,0,0,0,0,0), (0,0,0,0,0,1,1), (0,0,0,1,1,0,0)],
+        [(0,1,1,0,0,0,0), (1,0,0,0,0,0,1), (0,0,1,1,0,0,0)],
+        [(0,0,1,1,0,0,0), (1,1,0,0,0,0,0), (0,1,1,0,0,0,0)],
+        [(0,0,0,1,1,0,0), (0,1,1,0,0,0,0), (1,1,0,0,0,0,0)],
+        [(0,0,0,0,1,1,0), (0,0,1,1,0,0,0), (1,0,0,0,0,0,1)]
+    ]
+    
+    frame_idx = frame_num % len(snake_frames)
+    return snake_frames[frame_idx]
+
+def display_snake_animation_frame(frame_num):
+    """Display a frame of the snake animation"""
+    patterns = snake_animation_frame(frame_num)
+    
+    # Display each digit with its pattern
+    turn_on_custom_segments(1, patterns[0])
+    time.sleep(0.005)
+    turn_on_custom_segments(2, patterns[1])
+    time.sleep(0.005)
+    turn_on_custom_segments(3, patterns[2])
+    time.sleep(0.005)
+
 def display_controller():
     """Main loop for the display controller"""
     setup_display()
@@ -93,6 +158,7 @@ def display_controller():
     
     try:
         current_number = 0
+        animation_frame = 0
         while True:
             # Check if we should continue running
             try:
@@ -106,15 +172,27 @@ def display_controller():
             # Read the current number to display
             try:
                 with open(DISPLAY_FILE, 'r') as f:
-                    new_number = int(f.read().strip())
-                    if new_number != current_number:
-                        current_number = new_number
+                    display_status = f.read().strip()
+                    
+                    if display_status == "loading":
+                        # Show loading animation
+                        display_snake_animation_frame(animation_frame)
+                        animation_frame += 1
+                        # Slow down animation slightly
+                        time.sleep(0.02)
+                    else:
+                        try:
+                            # Try to interpret as a number
+                            new_number = int(display_status)
+                            if new_number != current_number:
+                                current_number = new_number
+                            display_number(current_number)
+                        except ValueError:
+                            # If not a number and not "loading", default to showing current number
+                            display_number(current_number)
             except:
                 # If file not found or error reading, continue with current number
-                pass
-                
-            # Display the number
-            display_number(current_number)
+                display_number(current_number)
             
     except KeyboardInterrupt:
         pass

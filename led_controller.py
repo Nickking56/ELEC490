@@ -104,6 +104,26 @@ def communication_cycle():
     for led in leds:
         led.value = 0
 
+def flash_all_leds():
+    """Flash all LEDs simultaneously once"""
+    # Turn off all LEDs first
+    for led in leds:
+        led.value = 0
+    
+    # Turn all LEDs on
+    for led in leds:
+        led.value = 1.0
+    
+    # Hold for a moment
+    time.sleep(0.5)
+    
+    # Turn all LEDs off
+    for led in leds:
+        led.value = 0
+    
+    # Short delay
+    time.sleep(0.2)
+
 def node_training():
     """Turn on node LED during local training"""
     # Turn off all LEDs
@@ -171,6 +191,12 @@ def led_controller():
                     elif status == "node_training":
                         node_training()
                         # Don't reset status for node training - keeps LED on
+                    
+                    elif status == "flash":
+                        flash_all_leds()
+                        # Reset status after performing action
+                        with open(LED_FILE, 'w') as f:
+                            f.write("none")
                             
                     elif status == "idle":
                         idle_mode()

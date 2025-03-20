@@ -26,8 +26,8 @@ class SleepModel(nn.Module):
 def server_program():
     host = "0.0.0.0"  
     port = 5001  
-    num_clients = 2  
-    global_iterations = 75 
+    num_clients = 3 
+    global_iterations = 100
 
     input_size = 11  
     num_classes = 3  
@@ -67,6 +67,7 @@ def server_program():
             torch.save(global_state, buffer)
             model_data = buffer.getvalue()
 
+            # Send to all clients simultaneously
             for client in clients:
                 client.sendall(struct.pack(">I", len(model_data)))  
                 client.sendall(model_data)  
@@ -74,6 +75,7 @@ def server_program():
 
         client_models = []
         client_accuracies = []
+        client_received_times = {}  # Track when each client's model is received
 
         def handle_client(conn):
             try:
@@ -89,6 +91,9 @@ def server_program():
                 while len(buffer) < msg_size:
                     buffer += conn.recv(msg_size - len(buffer))
 
+                # Record the time this client's update was received
+                client_received_times[conn] = time.time()
+                
                 print(f"Received {len(buffer)} bytes from Client {client_ids[conn]}")
                 buffer_io = io.BytesIO(buffer)
                 client_data = torch.load(buffer_io)
@@ -105,7 +110,12 @@ def server_program():
             thread.join()
 
         if len(client_models) == num_clients:
+            # Record time when all models are received
+            aggregation_start_time = time.time()
             print("Received all client weights. Beginning aggregation...")
+
+            # Simulate some time for aggregation (if aggregation is very quick)
+            # time.sleep(1.0)  # Uncomment if you want a minimum aggregation time
 
             global_state = {key: torch.stack([cm[key] for cm in client_models]).mean(dim=0) for key in client_models[0].keys()}
             global_model.load_state_dict(global_state)
