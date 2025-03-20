@@ -48,39 +48,14 @@ def update_display(number):
     with open(DISPLAY_FILE, 'w') as f:
         f.write(str(number))
 
-# Function to start loading animation on display
-def start_loading_animation():
-    """Start loading animation on display"""
-    with open(DISPLAY_FILE, 'w') as f:
-        f.write("loading")
-    
-    # Start LED loading animation
-    with open(LED_FILE, 'w') as f:
-        f.write("loading")
-    
-    # Wait for animation to initialize
-    time.sleep(0.2)
-
-# Function to flash all LEDs once
-def flash_all_leds():
-    """Flash all LEDs once to indicate connection status"""
-    with open(LED_FILE, 'w') as f:
-        f.write("flash")
-    time.sleep(0.6)  # Wait for flash to complete
-
 # Function to trigger LED sequences
-def trigger_communication(server_wait_time=0.5):
-    """Trigger the LED communication cycle with a variable server wait time"""
+def trigger_communication():
+    """Trigger the LED communication cycle"""
     with open(LED_FILE, 'w') as f:
-        f.write(f"communicate:{server_wait_time}")
+        f.write("communicate")
     
-    # Wait for LED animation to complete - dynamic wait time based on:
-    # - Time for LED chain to reach server (~0.1s)
-    # - Server wait time (variable)
-    # - Time for LED chain to return (~0.1s)
-    # - Small buffer (0.1s)
-    wait_time = 0.1 + server_wait_time + 0.1 + 0.1
-    time.sleep(wait_time)  # Adjusted wait time for the animation
+    # Wait for LED animation to complete
+    time.sleep(0.8)  # Adjusted wait time for the animation
 
 # Function to set node LED on during training
 def set_node_training():
@@ -127,7 +102,7 @@ def stop_controllers(display_process, led_process):
         led_process.terminate()
 
 def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
-    print(f"Client {client_id} starting up...")
+    print(f"Client {client_id} attempting to connect to server at {host}:{port}...")
     
     # Load client data
     X_client = pd.read_csv(os.path.join(data_dir, f"client_{client_id}", "X_client.csv"))
@@ -145,31 +120,16 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
     # Wait a moment for controllers to start
     time.sleep(0.5)
     
-    # Start loading animation
-    start_loading_animation()
+    # Reset displays to initial state
+    reset_displays()
     
     # Register function to stop controllers on exit
     atexit.register(lambda: stop_controllers(display_process, led_process))
     
-    print(f"Client {client_id} attempting to connect to server at {host}:{port}...")
-    
     # Connect to server
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        client_socket.connect((host, port))
-    except Exception as e:
-        print(f"Connection error: {e}")
-        # Stop the loading animation and show error (000)
-        reset_displays()
-        sys.exit(1)
-    
+    client_socket.connect((host, port))
     print(f"Client {client_id} connected to server at {host}:{port}")
-    
-    # Flash all LEDs to indicate successful connection
-    flash_all_leds()
-    
-    # Reset displays after connection
-    reset_displays()
     
     # Receive number of global iterations
     buffer = b""
@@ -182,12 +142,9 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
     num_classes = len(y_client["Sleep Disorder"].unique())
     model = SleepModel(input_size, num_classes)
     
-    # Initialize timing variables
-    send_time = 0
-    
     # Main training loop
     for iteration in range(global_iterations):
-        # Update display with current iteration + 1
+        # Update display with current iteration + 1 (fix the counter being behind)
         update_display(iteration + 1)
         
         print(f"\nClient {client_id} - Starting iteration {iteration + 1}/{global_iterations}...")
@@ -195,13 +152,6 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
         # Receive global model from server (except for first iteration)
         if iteration > 0:
             print(f"Receiving global model from server...")
-            
-            # Record time when we receive the global model
-            receive_time = time.time()
-            
-            # Calculate how long we were waiting (since sending our update)
-            wait_time = receive_time - send_time
-            print(f"Client {client_id} waited {wait_time:.2f} seconds for aggregated weights.")
             
             # Receive model size
             buffer = b""
@@ -253,9 +203,6 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
         torch.save(client_data, buffer)
         message = buffer.getvalue()
         
-        # Record time before sending weights
-        send_time = time.time()
-        
         # Send message size
         client_socket.sendall(struct.pack(">I", len(message)))
         # Send message
@@ -263,17 +210,11 @@ def client_program(client_id, data_dir, host="6.tcp.ngrok.io", port=17926):
         
         # Visualize communication cycle once per iteration
         print(f"Communicating with server...")
-        
-        # Use a minimum of 0.5s for server pause, but it may be longer in reality
-        # depending on how long it takes for the server to aggregate weights
-        trigger_communication(0.5)
+        trigger_communication()
         
         print(f"Iteration {iteration + 1} complete.")
     
-    # Training complete - flash all LEDs to indicate completion
-    flash_all_leds()
-    
-    # Close connection
+    # Training complete
     client_socket.close()
     print(f"Client {client_id} training complete.")
     
