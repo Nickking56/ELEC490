@@ -149,11 +149,31 @@ def client_program(client_id, data_dir, host="0.tcp.ngrok.io", port=19259):
         client_socket.connect((host, port))
         print(f"Client {client_id} connected to server at {host}:{port}")
         
-        # Connection successful - flash all LEDs to indicate success
-        flash_all_leds()
+        # Display waiting message
+        update_display("wait")
+        print(f"Client {client_id} waiting for all clients to be ready...")
         
-        # Reset display to show 0 after connection
-        update_display(0)
+        # Send ready signal to server
+        ready_message = struct.pack(">I", 1)  # 1 means ready
+        client_socket.sendall(ready_message)
+        
+        # Wait for server to signal all clients are ready
+        buffer = b""
+        while len(buffer) < 4:
+            buffer += client_socket.recv(4 - len(buffer))
+        start_signal = struct.unpack(">I", buffer)[0]
+        
+        if start_signal == 1:
+            # All clients are ready - flash all LEDs to indicate synchronization
+            print(f"All clients are ready. Starting training synchronously.")
+            flash_all_leds()
+            
+            # Reset display to show 0 after connection
+            update_display(0)
+        else:
+            print(f"Received unexpected start signal: {start_signal}")
+            update_display(0)
+            return
     except Exception as e:
         print(f"Connection failed: {e}")
         # Stop loading animation on error

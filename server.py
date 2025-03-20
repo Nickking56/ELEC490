@@ -5,7 +5,7 @@ import torch.nn as nn
 import io
 import struct
 import matplotlib.pyplot as plt
-import time  # Import time module
+import time
 
 # Define the neural network model
 class SleepModel(nn.Module):
@@ -50,7 +50,55 @@ def server_program():
         client_ids[conn] = i + 1  # Assign a client ID
         print(f"Client {client_ids[conn]} ({addr}) connected. ({len(clients)}/{num_clients})")
 
-    print("All clients connected. Server is ready to iterate.")
+    print("All clients connected. Waiting for all clients to be ready...")
+    
+    # Wait for all clients to signal they're ready
+    ready_clients = 0
+    ready_lock = threading.Lock()
+    
+    def wait_for_ready(conn):
+        nonlocal ready_clients
+        try:
+            buffer = b""
+            while len(buffer) < 4:
+                chunk = conn.recv(4 - len(buffer))
+                if not chunk:  # Connection closed
+                    print(f"Client {client_ids[conn]} disconnected while waiting for ready signal")
+                    return
+                buffer += chunk
+                
+            ready_signal = struct.unpack(">I", buffer)[0]
+            if ready_signal == 1:
+                with ready_lock:
+                    ready_clients += 1
+                    print(f"Client {client_ids[conn]} is ready. ({ready_clients}/{num_clients})")
+        except Exception as e:
+            print(f"Error waiting for ready signal from Client {client_ids[conn]}: {e}")
+    
+    # Create threads to wait for ready signals
+    ready_threads = [threading.Thread(target=wait_for_ready, args=(client,)) for client in clients]
+    for thread in ready_threads:
+        thread.start()
+    for thread in ready_threads:
+        thread.join()
+    
+    if ready_clients == num_clients:
+        print(f"All {ready_clients}/{num_clients} clients are ready. Starting training...")
+        
+        # Send start signal to all clients
+        for client in clients:
+            try:
+                start_message = struct.pack(">I", 1)  # 1 means start
+                client.sendall(start_message)
+            except Exception as e:
+                print(f"Error sending start signal to Client {client_ids[client]}: {e}")
+    else:
+        print(f"Only {ready_clients}/{num_clients} clients are ready. Cannot start training.")
+        # Close connections and exit
+        for client in clients:
+            client.close()
+        server_socket.close()
+        return
 
     # Start timing
     start_time = time.time()
